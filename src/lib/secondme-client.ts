@@ -114,6 +114,10 @@ export async function fetchUserInfo<T>() {
   return apiGet<T>("/api/user/info");
 }
 
+export async function fetchAuthSession() {
+  return apiGet<{ loggedIn: boolean }>("/api/auth/session");
+}
+
 export async function fetchShades<T>() {
   return apiGet<T>("/api/user/shades");
 }

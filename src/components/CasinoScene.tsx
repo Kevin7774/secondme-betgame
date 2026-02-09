@@ -29,6 +29,10 @@ export default function CasinoScene() {
       return "实时数据载入中...";
     }
 
+    if (!now) {
+      return "实时数据已准备就绪";
+    }
+
     return `已刷新实时数据：${new Date(now).toLocaleTimeString("zh-CN")}`;
   }, [actionNotice, loading, now]);
 
