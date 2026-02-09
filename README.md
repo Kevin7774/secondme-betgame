@@ -47,6 +47,12 @@ Optional:
 
 - `SECONDME_REDIRECT_URI` (if empty, app auto uses `{current-origin}/api/auth/callback`)
 
+## SecondMe state config
+
+- Project-level standard config file: `.secondme/state.json`
+- Runtime reads env vars first, and falls back to `.secondme/state.json` if missing
+- `.secondme/` is gitignored to avoid leaking credentials
+
 ## Local run
 
 ```bash

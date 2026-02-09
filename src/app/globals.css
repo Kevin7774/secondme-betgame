@@ -8,6 +8,8 @@
   --accent: #c58b2b;
   --accent-2: #1f9a8a;
   --line: rgba(32, 26, 22, 0.1);
+  --font-body: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-display: "STKaiti", "Kaiti SC", "Songti SC", "Noto Serif SC", serif;
 }
 
 * {
@@ -17,16 +19,16 @@
 body {
   background: var(--bg);
   color: var(--ink);
-  font-family: var(--font-body), "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-body);
   min-height: 100vh;
 }
 
 .font-display {
-  font-family: var(--font-display), "ZCOOL XiaoWei", "Noto Serif SC", serif;
+  font-family: var(--font-display);
 }
 
 .font-body {
-  font-family: var(--font-body), "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-body);
 }
 
 ::selection {

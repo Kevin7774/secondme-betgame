@@ -7,42 +7,94 @@ import type {
   TelemetryEventName,
 } from "@/types/domain";
 
-export type ApiResult<T> = {
-  code: number;
-  data: T;
-  message?: string;
-};
-
 export type ApiOutcome<T> = {
   ok: boolean;
   data: T | null;
   message?: string;
 };
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+function parseCode(value: unknown) {
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string" && /^\d+$/.test(value)) {
+    return Number(value);
+  }
+
+  return null;
+}
+
+function parseJsonSafely(input: string) {
+  try {
+    return JSON.parse(input) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function toMessage(payload: unknown, fallback: string) {
+  if (typeof payload === "string" && payload.trim()) {
+    return payload.trim();
+  }
+
+  if (isObject(payload)) {
+    const candidates = [payload.message, payload.error_description, payload.error];
+    for (const candidate of candidates) {
+      if (typeof candidate === "string" && candidate.trim()) {
+        return candidate.trim();
+      }
+    }
+  }
+
+  return fallback;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<ApiOutcome<T>> {
   try {
     const response = await fetch(path, { ...init, cache: "no-store" });
-    const result = (await response.json()) as ApiResult<T> | { message?: string };
+    const text = await response.text();
+    const parsed = parseJsonSafely(text);
 
     if (!response.ok) {
       return {
         ok: false,
         data: null,
-        message: result?.message ?? "请求失败",
+        message: toMessage(parsed, `请求失败 (HTTP ${response.status})`),
       };
     }
 
-    if ("code" in result && result.code === 0) {
-      return { ok: true, data: (result as ApiResult<T>).data };
+    if (!isObject(parsed)) {
+      return {
+        ok: false,
+        data: null,
+        message: "响应格式异常",
+      };
+    }
+
+    const code = parseCode(parsed.code);
+    if (code === 0) {
+      return {
+        ok: true,
+        data: ("data" in parsed ? (parsed.data as T) : null) ?? null,
+      };
     }
 
     return {
       ok: false,
       data: null,
-      message: (result as ApiResult<T>).message ?? "响应异常",
+      message: toMessage(parsed, "响应异常"),
     };
-  } catch {
-    return { ok: false, data: null, message: "网络异常" };
+  } catch (error) {
+    return {
+      ok: false,
+      data: null,
+      message: error instanceof Error ? error.message : "网络异常",
+    };
   }
 }
 

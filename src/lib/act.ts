@@ -1,3 +1,5 @@
+import { consumeSse } from "@/lib/sse";
+
 export type ActRequest = {
   message: string;
   actionControl: string;
@@ -22,47 +24,19 @@ export async function runAct(request: ActRequest) {
 }
 
 export async function readSseContent(response: Response) {
-  if (!response.body) {
-    throw new Error("响应体为空");
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
   let content = "";
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) {
-      break;
+  await consumeSse(response, (payload) => {
+    try {
+      const json = JSON.parse(payload);
+      const delta = json?.choices?.[0]?.delta?.content;
+      if (typeof delta === "string" && delta) {
+        content += delta;
+      }
+    } catch {
+      // 忽略非 JSON 片段
     }
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data:")) {
-        continue;
-      }
-
-      const payload = trimmed.replace(/^data:\s*/, "");
-      if (payload === "[DONE]") {
-        return content;
-      }
-
-      try {
-        const json = JSON.parse(payload);
-        const delta = json?.choices?.[0]?.delta?.content;
-        if (delta) {
-          content += delta;
-        }
-      } catch {
-        // 忽略非 JSON 片段
-      }
-    }
-  }
+  });
 
   return content;
 }

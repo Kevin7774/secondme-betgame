@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { consumeSse } from "@/lib/sse";
+
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
@@ -64,44 +66,22 @@ export default function ChatWindow({ disabled }: ChatWindowProps) {
       if (!response.ok || !response.body) {
         throw new Error("聊天接口响应异常");
       }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
       let assistantText = "";
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith("data:")) {
-            continue;
-          }
-          const payload = trimmed.replace(/^data:\s*/, "");
-          if (payload === "[DONE]") {
-            break;
-          }
-
-          const { delta, sessionId: nextSessionId } = parseChatDelta(payload);
-          if (nextSessionId) {
-            setSessionId(nextSessionId);
-          }
-          if (delta) {
-            assistantText += delta;
-            setMessages((prev) =>
-              prev.map((item, index) =>
-                index === assistantIndex ? { ...item, content: assistantText } : item
-              )
-            );
-          }
+      await consumeSse(response, (payload) => {
+        const { delta, sessionId: nextSessionId } = parseChatDelta(payload);
+        if (nextSessionId) {
+          setSessionId(nextSessionId);
         }
-      }
+
+        if (!delta) {
+          return;
+        }
+
+        assistantText += delta;
+        setMessages((prev) =>
+          prev.map((item, index) => (index === assistantIndex ? { ...item, content: assistantText } : item))
+        );
+      });
     } catch (error) {
       console.error(error);
       setMessages((prev) =>
