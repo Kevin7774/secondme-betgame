@@ -21,7 +21,7 @@ export default function useLiveFeeds() {
     leaderboard: [],
     reports: [],
     growth: null,
-    now: new Date().toISOString(),
+    now: "",
   });
 
   useEffect(() => {

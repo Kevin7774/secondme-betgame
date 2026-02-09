@@ -17,9 +17,13 @@ function nextMessage(): TickerMessage {
 }
 
 export default function LiveTicker() {
-  const [message, setMessage] = useState<TickerMessage>(nextMessage);
+  const [message, setMessage] = useState<TickerMessage>({
+    id: "initial",
+    text: "实时消息加载中…",
+  });
 
   useEffect(() => {
+    setMessage(nextMessage());
     const timer = setInterval(() => {
       setMessage(nextMessage());
     }, 3000);

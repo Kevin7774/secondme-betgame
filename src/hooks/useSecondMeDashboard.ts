@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { UserProfileData } from "@/components/UserProfile";
 import {
+  fetchAuthSession,
   fetchSessions,
   fetchShades,
   fetchSoftmemory,
@@ -28,6 +29,16 @@ export default function useSecondMeDashboard() {
 
   const loadProfile = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true }));
+    const sessionResult = await fetchAuthSession();
+    if (!sessionResult.ok || !sessionResult.data?.loggedIn) {
+      setState((prev) => ({
+        ...prev,
+        user: null,
+        loading: false,
+      }));
+      return;
+    }
+
     const result = await fetchUserInfo<UserProfileData>();
     setState((prev) => ({
       ...prev,
