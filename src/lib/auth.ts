@@ -128,15 +128,10 @@ export function buildSecondMeApiUrl(path: string) {
   assertPath(path);
   const env = getServerEnv();
 
-  const prefix = process.env.SECONDME_API_PREFIX ?? "";
   const cleanBase = env.SECONDME_API_BASE_URL.endsWith("/")
     ? env.SECONDME_API_BASE_URL.slice(0, -1)
     : env.SECONDME_API_BASE_URL;
-  const cleanPrefix = prefix
-    ? prefix.startsWith("/")
-      ? prefix
-      : `/${prefix}`
-    : "";
+  const cleanPrefix = env.SECONDME_API_PREFIX;
 
   return `${cleanBase}${cleanPrefix}${path}`;
 }
@@ -144,7 +139,7 @@ export function buildSecondMeApiUrl(path: string) {
 export function buildSecondMeAuthorizeUrl(request: Request) {
   const env = getServerEnv();
   const url = new URL(env.SECONDME_OAUTH_URL);
-  const scopes = (process.env.SECONDME_ALLOWED_SCOPES ?? "")
+  const scopes = env.SECONDME_ALLOWED_SCOPES
     .split(/[\s,]+/)
     .filter(Boolean);
   const redirectUri = resolveSecondMeRedirectUri(request);
