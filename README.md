@@ -37,12 +37,15 @@ Required:
 - `DATABASE_URL` (Postgres, Vercel-friendly)
 - `SECONDME_CLIENT_ID`
 - `SECONDME_CLIENT_SECRET`
-- `SECONDME_REDIRECT_URI`
 - `SECONDME_ALLOWED_SCOPES`
 - `SECONDME_API_BASE_URL`
 - `SECONDME_API_PREFIX`
 - `SECONDME_OAUTH_URL`
 - `SECONDME_TOKEN_ENDPOINT`
+
+Optional:
+
+- `SECONDME_REDIRECT_URI` (if empty, app auto uses `{current-origin}/api/auth/callback`)
 
 ## Local run
 
@@ -65,9 +68,10 @@ npm run build
 
 1. Use a managed Postgres (Neon/Supabase/Vercel Postgres).
 2. Configure all env vars in Vercel Project Settings.
-3. Set callback URL in SecondMe app to:
+3. Set callback URL in SecondMe app allowlist to include your domain callback:
    - `https://YOUR_DOMAIN/api/auth/callback`
-4. On deploy, run schema sync once:
+4. If Vercel env `SECONDME_REDIRECT_URI` is set to localhost, OAuth will fail. Set it to your Vercel domain callback or leave it empty for auto origin fallback.
+5. On deploy, run schema sync once:
    - `npx prisma db push`
 
 ## API overview

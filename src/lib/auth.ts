@@ -37,6 +37,56 @@ function parseJsonSafely(input: string) {
   }
 }
 
+function isLoopbackHost(hostname: string) {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+function toErrorString(value: unknown) {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+
+  if (value && typeof value === "object") {
+    try {
+      const serialized = JSON.stringify(value);
+      if (serialized && serialized !== "{}") {
+        return serialized;
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function parseErrorCode(value: unknown) {
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string" && /^\d+$/.test(value)) {
+    return Number(value);
+  }
+
+  return null;
+}
+
+function buildRemoteErrorMessage(
+  fallback: string,
+  status: number,
+  result: Record<string, unknown> | null,
+  text: string
+) {
+  const detail =
+    toErrorString(result?.error_description) ??
+    toErrorString(result?.message) ??
+    toErrorString(result?.error) ??
+    (text.trim() ? text.trim().slice(0, 240) : null);
+
+  return detail ? `${fallback} (HTTP ${status}): ${detail}` : `${fallback} (HTTP ${status})`;
+}
+
 function assertPath(path: string) {
   if (!path.startsWith("/") || path.includes("://")) {
     throw new Error("非法 API 路径");
@@ -50,6 +100,28 @@ export async function getSessionUserId() {
 
 export function getAuthCookieName() {
   return COOKIE_NAME;
+}
+
+export function resolveSecondMeRedirectUri(request: Request) {
+  const env = getServerEnv();
+  const configured = env.SECONDME_REDIRECT_URI;
+
+  if (configured) {
+    try {
+      const parsed = new URL(configured);
+      if (!(process.env.NODE_ENV === "production" && isLoopbackHost(parsed.hostname))) {
+        return configured;
+      }
+
+      console.warn(
+        "[OAuth] SECONDME_REDIRECT_URI points to localhost in production, fallback to request origin."
+      );
+    } catch {
+      console.warn("[OAuth] SECONDME_REDIRECT_URI is invalid, fallback to request origin.");
+    }
+  }
+
+  return new URL("/api/auth/callback", request.url).toString();
 }
 
 export function buildSecondMeApiUrl(path: string) {
@@ -69,15 +141,16 @@ export function buildSecondMeApiUrl(path: string) {
   return `${cleanBase}${cleanPrefix}${path}`;
 }
 
-export function buildSecondMeAuthorizeUrl() {
+export function buildSecondMeAuthorizeUrl(request: Request) {
   const env = getServerEnv();
   const url = new URL(env.SECONDME_OAUTH_URL);
   const scopes = (process.env.SECONDME_ALLOWED_SCOPES ?? "")
     .split(/[\s,]+/)
     .filter(Boolean);
+  const redirectUri = resolveSecondMeRedirectUri(request);
 
   url.searchParams.set("client_id", env.SECONDME_CLIENT_ID);
-  url.searchParams.set("redirect_uri", env.SECONDME_REDIRECT_URI);
+  url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("response_type", "code");
 
   if (scopes.length) {
@@ -95,14 +168,15 @@ function normalizeTokenResponse(result: unknown): SecondMeTokenPayload {
   return result as SecondMeTokenPayload;
 }
 
-export async function exchangeCodeForToken(code: string) {
+export async function exchangeCodeForToken(code: string, request: Request) {
   const env = getServerEnv();
+  const redirectUri = resolveSecondMeRedirectUri(request);
   const body = new URLSearchParams({
     grant_type: "authorization_code",
     code,
     client_id: env.SECONDME_CLIENT_ID,
     client_secret: env.SECONDME_CLIENT_SECRET,
-    redirect_uri: env.SECONDME_REDIRECT_URI,
+    redirect_uri: redirectUri,
   });
 
   const response = await fetch(env.SECONDME_TOKEN_ENDPOINT, {
@@ -116,10 +190,11 @@ export async function exchangeCodeForToken(code: string) {
 
   const text = await response.text();
   const result = parseJsonSafely(text);
+  const remoteCode = parseErrorCode(result?.code);
 
-  if (!response.ok) {
+  if (!response.ok || (remoteCode !== null && remoteCode !== 0)) {
     throw new Error(
-      String(result?.error_description ?? result?.message ?? "Token 请求失败")
+      `${buildRemoteErrorMessage("Token 请求失败", response.status, result, text)}; redirect_uri=${redirectUri}`
     );
   }
 
@@ -146,9 +221,10 @@ export async function refreshAccessToken(refreshToken: string) {
 
   const text = await response.text();
   const result = parseJsonSafely(text);
+  const remoteCode = parseErrorCode(result?.code);
 
-  if (!response.ok) {
-    throw new Error(String(result?.error_description ?? result?.message ?? "刷新 Token 失败"));
+  if (!response.ok || (remoteCode !== null && remoteCode !== 0)) {
+    throw new Error(buildRemoteErrorMessage("刷新 Token 失败", response.status, result, text));
   }
 
   return normalizeTokenResponse(result);
@@ -184,9 +260,10 @@ export async function fetchSecondMe<T>(path: string, accessToken: string, init?:
 
   const text = await response.text();
   const result = parseJsonSafely(text);
+  const remoteCode = parseErrorCode(result?.code);
 
-  if (!response.ok) {
-    throw new Error(String(result?.message ?? "SecondMe API 请求失败"));
+  if (!response.ok || (remoteCode !== null && remoteCode !== 0)) {
+    throw new Error(buildRemoteErrorMessage("SecondMe API 请求失败", response.status, result, text));
   }
 
   if (!result) {

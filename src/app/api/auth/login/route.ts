@@ -9,6 +9,6 @@ export async function GET(request: Request) {
     return throttled;
   }
 
-  const url = buildSecondMeAuthorizeUrl();
+  const url = buildSecondMeAuthorizeUrl(request);
   return NextResponse.redirect(url);
 }

@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const tokenPayload = await exchangeCodeForToken(code);
+    const tokenPayload = await exchangeCodeForToken(code, request);
 
     if (!tokenPayload?.access_token || !tokenPayload.refresh_token) {
       return NextResponse.redirect(new URL("/?error=token_invalid", request.url));
